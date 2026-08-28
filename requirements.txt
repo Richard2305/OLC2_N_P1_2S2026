@@ -1,0 +1,8 @@
+asgiref==3.12.1
+Django==6.1
+graphviz==0.21
+greenlet==3.5.5
+ply==3.11
+pyee==13.0.1
+sqlparse==0.6.0
+typing_extensions==4.16.0

@@ -1,0 +1,19 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+db.sqlite3
+.env
+api/interpreter/parsetab.py
+api/interpreter/parser.out
+.DS_Store
+Capturas/
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+!Manual de Usuario.pdf
+*.tex
+.vscode/

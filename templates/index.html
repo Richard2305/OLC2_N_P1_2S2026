@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>OxigenScript IDE</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f4f4f9;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            height: 80vh;
+        }
+
+        .editor-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #editor {
+            flex: 1;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+        }
+
+        .panels {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .panel {
+            flex: 1;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .tab {
+            padding: 5px 10px;
+            cursor: pointer;
+            background: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .tab.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #f4f4f9;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+</head>
+
+<body>
+    <div class="header">
+        <h2>OxigenScript IDE</h2>
+        <div>
+            <input type="file" id="file-input" accept=".oxs,.txt" style="display: none;" onchange="loadFile(event)">
+            <button class="btn" style="background: #28a745;"
+                onclick="document.getElementById('file-input').click()">Cargar Archivo</button>
+            <button class="btn" onclick="executeCode()">▶ Ejecutar</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="editor-section">
+            <textarea id="editor" placeholder="Escribe tu código OxigenScript aquí...">
+fn main() {
+    println!("Hola Mundo");
+}
+            </textarea>
+        </div>
+
+        <div class="panels">
+            <div class="panel">
+                <h3>Consola</h3>
+                <pre id="console-output"></pre>
+            </div>
+
+            <div class="panel">
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('errors')">Errores</div>
+                    <div class="tab" onclick="switchTab('symbols')">Tabla de Símbolos</div>
+                    <div class="tab" onclick="switchTab('ast')">AST</div>
+                    <div class="tab" style="background:#17a2b8; color:white; border-color:#17a2b8;"
+                        onclick="openAstInNewTab()">Abrir AST ↗</div>
+                </div>
+
+                <div id="errors" class="tab-content active">
+                    <table id="errors-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                                <th>Línea</th>
+                                <th>Columna</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="symbols" class="tab-content">
+                    <table id="symbols-table">
+                        <thead>
+                            <tr>
+                                <th>Identificador</th>
+                                <th>Categoría</th>
+                                <th>Tipo</th>
+                                <th>Ámbito</th>
+                                <th>Línea</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="ast" class="tab-content">
+                    <pre id="ast-output"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var lastAstDot = null;
+
+        function openAstInNewTab() {
+            if (!lastAstDot) {
+                alert('Primero ejecuta el código para generar el AST.');
+                return;
+            }
+            try {
+                var viz = new Viz();
+                viz.renderSVGElement(lastAstDot)
+                    .then(function (element) {
+                        var win = window.open('', '_blank');
+                        win.document.write('<html><head><title>AST - OxigenScript</title>');
+                        win.document.write('<style>body { background: #f4f4f9; display: flex; justify-content: center; padding: 20px; } svg { max-width: 100%; height: auto; }</style>');
+                        win.document.write('</head><body>');
+                        win.document.write(element.outerHTML);
+                        win.document.write('</body></html>');
+                        win.document.close();
+                    })
+                    .catch(function (err) {
+                        alert('Error renderizando AST: ' + err);
+                    });
+            } catch (e) {
+                alert('Error: ' + e);
+            }
+        }
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('editor').value = e.target.result;
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        async function executeCode() {
+            const code = document.getElementById('editor').value;
+            const consoleOutput = document.getElementById('console-output');
+            const errorsTable = document.getElementById('errors-table').querySelector('tbody');
+            const symbolsTable = document.getElementById('symbols-table').querySelector('tbody');
+            const astOutput = document.getElementById('ast-output');
+
+            consoleOutput.textContent = "Ejecutando...";
+
+            try {
+                const response = await fetch('/api/execute/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    consoleOutput.textContent = "Error del servidor: " + data.error;
+                    return;
+                }
+
+                consoleOutput.textContent = data.console;
+
+                // Render Errors
+                errorsTable.innerHTML = '';
+                data.errors.forEach(err => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${err.tipo}</td><td>${err.descripcion}</td><td>${err.linea}</td><td>${err.columna}</td>`;
+                    errorsTable.appendChild(tr);
+                });
+
+                // Render Symbols
+                symbolsTable.innerHTML = '';
+                data.symbols.forEach(sym => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${sym.identificador}</td><td>${sym.categoria}</td><td>${sym.tipo}</td><td>${sym.ambito}</td><td>${sym.linea}</td><td>${sym.valor}</td>`;
+                    symbolsTable.appendChild(tr);
+                });
+
+                // Render AST
+                lastAstDot = data.ast_dot;
+                try {
+                    var viz = new Viz();
+                    viz.renderSVGElement(data.ast_dot)
+                        .then(function (element) {
+                            astOutput.innerHTML = "";
+                            astOutput.appendChild(element);
+                        })
+                        .catch(error => {
+                            viz = new Viz();
+                            astOutput.textContent = "Error renderizando AST: " + error;
+                        });
+                } catch (e) {
+                    astOutput.textContent = data.ast_dot;
+                }
+
+            } catch (error) {
+                consoleOutput.textContent = "Error de conexión: " + error.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
