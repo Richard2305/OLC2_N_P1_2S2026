@@ -152,20 +152,28 @@ class RelationalNode(Expression):
         return node_id, dot, counter
 
 class ArrayInitNode(Expression):
-    def __init__(self, expr_list, line, column):
+    def __init__(self, expr_list, repeat_tuple, line, column):
         super().__init__(line, column)
         self.expr_list = expr_list
+        self.repeat_tuple = repeat_tuple
 
     def execute(self, env, error_manager, console):
-        values = [expr.execute(env, error_manager, console)[0] for expr in self.expr_list]
-        return values, OxigenType.ARRAY
+        if self.expr_list is not None:
+            values = [expr.execute(env, error_manager, console)[0] for expr in self.expr_list]
+            return values, OxigenType.ARRAY
+        else:
+            val, _ = self.repeat_tuple[0].execute(env, error_manager, console)
+            rep, _ = self.repeat_tuple[1].execute(env, error_manager, console)
+            if rep is None: return None, OxigenType.NULL
+            return [val] * int(rep), OxigenType.ARRAY
 
     def get_dot(self, counter):
         node_id = f"n{counter}"; counter += 1
         dot = f'{node_id} [label="Array"];\n'
-        for expr in self.expr_list:
-            id_c, dot_c, counter = expr.get_dot(counter)
-            dot += dot_c + f'{node_id} -> {id_c};\n'
+        if self.expr_list:
+            for expr in self.expr_list:
+                id_c, dot_c, counter = expr.get_dot(counter)
+                dot += dot_c + f'{node_id} -> {id_c};\n'
         return node_id, dot, counter
 
 class ArrayAccessNode(Expression):
@@ -279,8 +287,13 @@ class FunctionCallNode(Expression):
             error_manager.add_error(InterpreterError(ErrorType.SEMANTIC, f"La función '{self.name}' no ha sido declarada.", self.line, self.column))
             return None, OxigenType.NULL
         func_node = func_entry["node"]
+        if len(self.arg_list) != len(func_node.params):
+            from ..errors.error import InterpreterError, ErrorType
+            error_manager.add_error(InterpreterError(ErrorType.SEMANTIC, f"La función '{self.name}' esperaba {len(func_node.params)} argumentos, pero recibió {len(self.arg_list)}.", self.line, self.column))
+            return None, OxigenType.NULL
+
         from ..env.environment import Environment
-        local_env = Environment(env.get_global(), f"fn_{self.name}")
+        local_env = Environment(env.get_global(), self.name)
         for i, (pname, ptype, pmut) in enumerate(func_node.params):
             pval, ptyp = (self.arg_list[i].execute(env, error_manager, console) if i < len(self.arg_list) else (None, OxigenType.NULL))
             local_env.save_variable(pname, ptype, pval, pmut, self.line, self.column)
@@ -311,7 +324,9 @@ class MethodCallNode(Expression):
             return len(val), OxigenType.I32
         elif m == 'contains' and self.args:
             sub, _ = self.args[0].execute(env, error_manager, console)
-            return sub in str(val), OxigenType.BOOL
+            if isinstance(val, list):
+                return sub in val, OxigenType.BOOL
+            return str(sub) in str(val), OxigenType.BOOL
         elif m == 'replace' and len(self.args) >= 2:
             s1, _ = self.args[0].execute(env, error_manager, console)
             s2, _ = self.args[1].execute(env, error_manager, console)
@@ -346,7 +361,14 @@ class TypeofNode(Expression):
 
     def execute(self, env, error_manager, console):
         _, t = self.expr.execute(env, error_manager, console)
-        return str(t), OxigenType.STRING
+        t_str = "STRUCT"
+        if t == OxigenType.I32: t_str = "i32"
+        elif t == OxigenType.F64: t_str = "f64"
+        elif t == OxigenType.BOOL: t_str = "bool"
+        elif t == OxigenType.CHAR: t_str = "char"
+        elif t == OxigenType.STRING: t_str = "String"
+        elif t == OxigenType.ARRAY: t_str = "Array"
+        return t_str, OxigenType.STRING
 
     def get_dot(self, counter):
         node_id = f"n{counter}"; counter += 1

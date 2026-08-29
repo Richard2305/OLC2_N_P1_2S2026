@@ -135,9 +135,13 @@ def p_stmt(p):
             | while_stmt
             | loop_stmt
             | match_stmt
-            | block_stmt'''
+            | block_stmt
+            | error SEMICOLON
+            | error RBRACE'''
     if len(p) == 3 and p.slice[1].type == 'expression':
         p[0] = ExpressionStmtNode(p[1], p.lineno(1), p.lexpos(1))
+    elif len(p) == 3 and p.slice[1].type == 'error':
+        p[0] = None
     else:
         p[0] = p[1]
 
@@ -149,14 +153,12 @@ def p_block_stmt(p):
 # println!
 # ──────────────────────────────────────────────────────────────────────────
 def p_println_stmt_plain(p):
-    '''println_stmt : PRINTLN_MACRO LPAREN STRING_LITERAL RPAREN'''
-    fmt = LiteralNode(p[3], OxigenType.STRING, p.lineno(3), p.lexpos(3))
-    p[0] = PrintlnNode([fmt], p.lineno(1), p.lexpos(1))
+    '''println_stmt : PRINTLN_MACRO LPAREN expression RPAREN'''
+    p[0] = PrintlnNode([p[3]], p.lineno(1), p.lexpos(1))
 
 def p_println_stmt_fmt(p):
-    '''println_stmt : PRINTLN_MACRO LPAREN STRING_LITERAL COMMA arg_list RPAREN'''
-    fmt = LiteralNode(p[3], OxigenType.STRING, p.lineno(3), p.lexpos(3))
-    p[0] = PrintlnNode([fmt] + p[5], p.lineno(1), p.lexpos(1))
+    '''println_stmt : PRINTLN_MACRO LPAREN expression COMMA arg_list RPAREN'''
+    p[0] = PrintlnNode([p[3]] + p[5], p.lineno(1), p.lexpos(1))
 
 def p_arg_list(p):
     '''arg_list : arg_list COMMA expression
@@ -386,10 +388,14 @@ def p_expr_func_call(p):
     '''expression : IDENTIFIER LPAREN expr_list RPAREN'''
     p[0] = FunctionCallNode(p[1], p[3], p.lineno(1), p.lexpos(1))
 
-# Array literal [1, 2, 3]
+# Array literal [1, 2, 3] or [val; rep]
 def p_expr_array(p):
-    '''expression : LBRACKET expr_list RBRACKET'''
-    p[0] = ArrayInitNode(p[2], p.lineno(1), p.lexpos(1))
+    '''expression : LBRACKET expr_list RBRACKET
+                  | LBRACKET expression SEMICOLON expression RBRACKET'''
+    if len(p) == 4:
+        p[0] = ArrayInitNode(p[2], None, p.lineno(1), p.lexpos(1))
+    else:
+        p[0] = ArrayInitNode(None, (p[2], p[4]), p.lineno(1), p.lexpos(1))
 
 def p_opt_comma(p):
     '''opt_comma : COMMA
@@ -449,10 +455,6 @@ def p_error(p):
             f"Error sintáctico cerca de '{p.value}'.", p.lineno, p.lexpos)
         if hasattr(parser, 'error_manager'):
             parser.error_manager.add_error(err)
-        while True:
-            tok = parser.token()
-            if not tok or tok.type in ('SEMICOLON', 'RBRACE'):
-                break
-        parser.errok()
+        # Rely on PLY's built-in error recovery mechanisms. No manual token consumption.
 
 parser = yacc.yacc()

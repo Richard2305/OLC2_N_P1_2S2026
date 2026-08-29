@@ -21,8 +21,24 @@ class PrintlnNode(Instruction):
             console.append("")
             return
         fmt_node = self.expressions[0]
-        fmt_str, _ = fmt_node.execute(env, error_manager, console)
-        fmt_str = str(fmt_str) if fmt_str is not None else ""
+        fmt_val, _ = fmt_node.execute(env, error_manager, console)
+
+        if len(self.expressions) == 1:
+            if isinstance(fmt_val, list):
+                inner = []
+                for item in fmt_val:
+                    if isinstance(item, str): inner.append(f'"{item}"')
+                    else: inner.append(str(item))
+                console.append("[" + ", ".join(inner) + "]")
+            elif isinstance(fmt_val, bool):
+                console.append("true" if fmt_val else "false")
+            elif fmt_val is None:
+                return  # Semantic error already registered; don't print anything
+            else:
+                console.append(str(fmt_val))
+            return
+
+        fmt_str = str(fmt_val) if fmt_val is not None else ""
 
         vals = []
         for exp in self.expressions[1:]:
@@ -216,7 +232,7 @@ class BlockNode(Instruction):
 
     def execute(self, env, error_manager, console):
         from ..env.environment import Environment
-        local_env = Environment(env, f"{env.name}_blk")
+        local_env = Environment(env, env.name)
         for inst in self.instructions:
             if inst is None: continue
             result = inst.execute(local_env, error_manager, console)

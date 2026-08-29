@@ -60,8 +60,13 @@ def t_COMMENT_LINE(t):
     pass  # discard
 
 def t_RAW_STRING(t):
-    r'r"[^"]*"'
-    t.value = t.value[2:-1]
+    r'r\#"(?:.|\n)*?"\#|r"(?:.|\n)*?"'
+    # Handles both r"..." and r#"..."# properly, even with internal quotes
+    val = t.value
+    if val.startswith('r#"') and val.endswith('"#'):
+        t.value = val[3:-2]
+    elif val.startswith('r"') and val.endswith('"'):
+        t.value = val[2:-1]
     return t
 
 def t_STRING_LITERAL(t):

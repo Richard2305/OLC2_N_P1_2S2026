@@ -25,10 +25,11 @@ class CompilerEngine:
             # Parse
             ast_nodes = parser.parse(source_code, lexer=lexer)
             
-            if ast_nodes and not self.error_manager.has_errors():
+            if ast_nodes:
                 # First pass: register functions
                 main_func = None
                 for node in ast_nodes:
+                    if node is None: continue
                     from .ast.instructions import FunctionNode
                     if isinstance(node, FunctionNode):
                         node.execute(self.global_env, self.error_manager, self.console)
@@ -37,7 +38,9 @@ class CompilerEngine:
                 
                 # Execute main
                 if main_func:
-                    main_func.block.execute(self.global_env, self.error_manager, self.console)
+                    from .env.environment import Environment as Env
+                    main_env = Env(self.global_env, "main")
+                    main_func.block.execute(main_env, self.error_manager, self.console)
                 else:
                     self.console.append("[Error] No se encontró la función 'main'.")
                     
