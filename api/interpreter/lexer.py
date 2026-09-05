@@ -8,6 +8,7 @@ reserved = {
     'if':       'IF',
     'else':     'ELSE',
     'while':    'WHILE',
+    'repeat':   'REPEAT',
     'loop':     'LOOP',
     'match':    'MATCH',
     'break':    'BREAK',

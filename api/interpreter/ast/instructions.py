@@ -1,5 +1,6 @@
 from .ast_nodes import Instruction
 from ..env.types import OxigenType
+from ..errors.error import InterpreterError, ErrorType
 
 def _result_type(val):
     if isinstance(val, bool):   return OxigenType.BOOL
@@ -323,6 +324,60 @@ class LoopNode(Instruction):
         id_b, dot_b, counter = self.block.get_dot(counter)
         dot += dot_b + f'{node_id} -> {id_b};\n'
         return node_id, dot, counter
+
+
+
+
+
+
+class RepeatNode(Instruction):
+    def __init__(self, block, count, label, line, column):
+        super().__init__(line, column)
+        self.block = block
+        self.count = count
+        self.label = label
+
+    def get_dot(self, counter):
+        node_id = f"n{counter}"
+        counter += 1
+        dot = f'{node_id} [label="Repeat"];\n'
+
+        id_count, dot_count, counter = self.count.get_dot(counter)
+        id_block, dot_block, counter = self.block.get_dot(counter)
+
+        dot += dot_count
+        dot += dot_block
+        dot += f'{node_id} -> {id_count};\n'
+        dot += f'{node_id} -> {id_block};\n'
+
+        return node_id, dot, counter
+
+    def execute(self, env, error_manager, console):
+        count, count_type = self.count.execute(env, error_manager, console)
+
+        for _ in range(count):
+            res = self.block.execute(env, error_manager, console)
+
+            if res:
+                kind = res[0]
+                label = res[3] if len(res) > 3 else None
+
+                if kind == "break":
+                    if label is None or label == self.label:
+                        break
+                    return res
+
+                if kind == "continue":
+                    if label is None or label == self.label:
+                        continue
+                    return res
+
+                if kind == "return":
+                    return res
+
+
+
+
 
 # ─────────────────────────────────────────────
 class MatchNode(Instruction):

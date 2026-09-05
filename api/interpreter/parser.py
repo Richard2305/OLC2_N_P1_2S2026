@@ -6,7 +6,7 @@ from .ast.expressions import (LiteralNode, IdentifierNode, ArithmeticNode,
     FunctionCallNode, MethodCallNode, FieldAccessNode, SliceNode,
     StructInitNode, TypeofNode)
 from .ast.instructions import (PrintlnNode, DeclarationNode, AssignmentNode,
-    BlockNode, IfNode, WhileNode, FunctionNode, TransferNode, LoopNode,
+    BlockNode, IfNode, WhileNode, FunctionNode, TransferNode, LoopNode, RepeatNode,
     MatchNode, StructDeclNode, ArrayAssignmentNode, ExpressionStmtNode)
 from .env.types import OxigenType
 from .errors.error import InterpreterError, ErrorType
@@ -254,6 +254,24 @@ def p_while_stmt(p):
 def p_loop_plain(p):
     '''loop_stmt : LOOP LBRACE stmt_list RBRACE'''
     p[0] = LoopNode(BlockNode(p[3], p.lineno(2), p.lexpos(2)), None, p.lineno(1), p.lexpos(1))
+
+
+
+
+
+
+def p_repeat_plain(p):
+    '''loop_stmt : REPEAT expression LBRACE stmt_list RBRACE'''
+    p[0] = RepeatNode(
+        BlockNode(p[4], p.lineno(3), p.lexpos(3)),
+        p[2],
+        None,
+        p.lineno(1),
+        p.lexpos(1)
+    )
+
+
+
 
 def p_loop_labeled(p):
     '''loop_stmt : LABEL COLON LOOP LBRACE stmt_list RBRACE'''
